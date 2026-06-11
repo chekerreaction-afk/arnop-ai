@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARNOP — Auto-Model AI System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --chat-bg: #0d0d0d;
+            --user-bubble: #1a1a2e;
+            --ai-bubble: #1a1a1a;
+            --border: #1f1f1f;
+            --accent: #7c3aed;
+            --text: #e5e5e5;
+            --text-sec: #888;
+            --input-bg: #1a1a1a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; }
+
+        .screen { display: none; width: 100%; height: 100vh; flex-direction: column; }
+
+        /* Dashboard */
+        #dashboard { align-items: center; justify-content: flex-start; padding: 40px 20px; overflow-y: auto; }
+        .card { background: #111; border: 1px solid var(--border); padding: 30px; border-radius: 16px; width: 100%; max-width: 750px; }
+        .card h1 { margin-bottom: 25px; font-size: 24px; text-align: center; font-weight: 700; color: #fff;}
+        .card h1 span { color: var(--accent); }
+        
+        .agent-item { background: #080808; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 15px; position: relative; }
+        .agent-config-row { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; align-items: center; }
+        
+        .btn-add { background: transparent; border: 1px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: 600; margin-bottom: 20px; }
+        .btn-del { position: absolute; top: 10px; right: 10px; color: #ff4444; background: none; border: none; cursor: pointer; font-size: 11px; font-weight: 600; }
+        .btn-save { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        
+        input, select { width: 100%; padding: 12px; background: #141414; border: 1px solid var(--border); color: #fff; border-radius: 8px; outline: none; font-size: 14px; }
+        input:focus { border-color: var(--accent); }
+
+        /* Chat Layout */
+        header { height: 60px; border-bottom: 1px solid var(--border); background: var(--chat-bg); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+        .logo { font-weight: 700; font-size: 18px; color: var(--text); }
+        .btn-setup { background: none; border: 1px solid var(--border); color: var(--text-sec); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+        #chat-window { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .message { display: flex; flex-direction: column; max-width: 92%; animation: fadeIn 0.3s ease; }
+        .message.user { align-self: flex-end; align-items: flex-end; }
+        .message.ai { align-self: flex-start; align-items: flex-start; width: 100%;}
+        
+        .agent-label { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 4px; text-transform: uppercase; }
+        .bubble { padding: 8px 0; font-size: 16px; line-height: 1.6; word-wrap: break-word; color: #e5e5e5; }
+        .user .bubble { background: var(--user-bubble); padding: 12px 16px; border-radius: 12px 12px 2px 12px; border-left: 3px solid var(--accent); }
+        .ai .bubble { background: transparent; border-bottom: 1px solid var(--border); width: 100%; padding-bottom: 15px; }
+
+        /* Input area */
+        .input-area { background: var(--bg); padding: 20px; border-top: 1px solid var(--border); }
+        .input-wrapper { max-width: 900px; margin: 0 auto; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+        textarea { width: 100%; background: none; border: none; color: var(--text); outline: none; resize: none; font-size: 16px; min-height: 24px; }
+        
+        #status-bar { display: none; padding: 10px 20px; align-items: center; gap: 8px; color: var(--accent); font-size: 13px; }
+        .spin { width: 12px; height: 12px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: rot 0.8s linear infinite; }
+        @keyframes rot { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: DASHBOARD -->
+    <div id="dashboard" class="screen">
+        <div class="card">
+            <h1>ARN<span>O</span>P - API Management</h1>
+            <p style="text-align: center; font-size: 12px; color: #666; margin-bottom: 25px;">Everything is configured automatically for your APIs.</p>
+            
+            <div id="agent-list">
+                <!-- Agent Rows injected here -->
+            </div>
+
+            <button class="btn-add" onclick="addNewAgent()">+ Add New API / Agent</button>
+            <button class="btn-save" id="save-settings">Save & Start Chat</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: CHAT -->
+    <div id="chat" class="screen">
+        <header>
+            <div class="logo">ARNOP</div>
+            <button class="btn-setup" onclick="openSettings()">Dashboard</button>
+        </header>
+
+        <div id="chat-window"></div>
+        
+        <div id="status-bar">
+            <div class="spin"></div>
+            <span id="status-text">Processing...</span>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="user-input" placeholder="Ask me anything..." rows="1"></textarea>
+                <div style="display:flex; justify-content: flex-end; margin-top:10px;">
+                    <button id="send-btn" style="background:var(--accent); color:white; border:none; padding:8px 18px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 16px;">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const store = {
+            set: (val) => localStorage.setItem('arnop_data', JSON.stringify(val)),
+            get: () => JSON.parse(localStorage.getItem('arnop_data') || '[]')
+        };
+
+        const autoModels = {
+            groq: "llama-3.3-70b-versatile", 
+            gemini: "gemini-2.0-flash", 
+            mistral: "mistral-small-latest",
+            deepseek: "deepseek-chat"
+        };
+
+        let agents = store.get();
+        if (agents.length === 0) {
+            agents = [{ name: 'Arnop', provider: 'groq', key: '' }];
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function renderDashboard() {
+            const list = document.getElementById('agent-list');
+            list.innerHTML = '';
+            agents.forEach((agent, i) => {
+                const row = document.createElement('div');
+                row.className = 'agent-item';
+                row.innerHTML = `
+                    <button class="btn-del" onclick="removeAgent(${i})">Delete</button>
+                    <div class="agent-config-row">
+                        <input type="text" placeholder="Agent Name" value="${agent.name}" onchange="update(${i}, 'name', this.value)">
+                        <select onchange="update(${i}, 'provider', this.value)">
+                            <option value="groq" ${agent.provider==='groq'?'selected':''}>Groq API</option>
+                            <option value="gemini" ${agent.provider==='gemini'?'selected':''}>Gemini API</option>
+                            <option value="mistral" ${agent.provider==='mistral'?'selected':''}>Mistral API</option>
+                            <option value="deepseek" ${agent.provider==='deepseek'?'selected':''}>DeepSeek API</option>
+                        </select>
+                        <input type="password" placeholder="Paste API Key here" value="${agent.key}" onchange="update(${i}, 'key', this.value.trim())">
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function update(i, field, val) { agents[i][field] = val; }
+        function addNewAgent() { agents.push({ name: 'Assistant', provider: 'groq', key: '' }); renderDashboard(); }
+        function removeAgent(i) { agents.splice(i, 1); renderDashboard(); }
+        function openSettings() { showScreen('dashboard'); renderDashboard(); }
+
+        document.getElementById('save-settings').onclick = () => {
+            if (agents.some(a => !a.key)) return alert("Please provide API Keys for all agents.");
+            store.set(agents);
+            showScreen('chat');
+            initEmptyChat();
+        };
+
+        async function apiRequest(agent, messages) {
+            const model = autoModels[agent.provider];
+            let url, body, headers = { "Content-Type": "application/json" };
+            
+            if (agent.provider === 'gemini') {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${agent.key}`;
+                body = JSON.stringify({ contents: [{ parts: [{ text: messages[messages.length-1].content }] }] });
+            } else {
+                const urlMap = {
+                    groq: "https://api.groq.com/openai/v1/chat/completions",
+                    mistral: "https://api.mistral.ai/v1/chat/completions",
+                    deepseek: "https://api.deepseek.com/v1/chat/completions"
+                };
+                url = urlMap[agent.provider];
+                headers["Authorization"] = `Bearer ${agent.key}`;
+                body = JSON.stringify({ model: model, messages: messages });
+            }
+
+            const response = await fetch(url, { method: 'POST', headers, body });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error?.message || "Check API balance or Key.");
+            return agent.provider === 'gemini' ? data.candidates[0].content.parts[0].text : data.choices[0].message.content;
+        }
+
+        async function handleSend() {
+            const el = document.getElementById('user-input');
+            const val = el.value.trim();
+            if (!val) return;
+
+            if (document.getElementById('chat-window').querySelector('.empty-note')) document.getElementById('chat-window').innerHTML = '';
+            
+            appendMsg(val, 'user');
+            el.value = '';
+            el.style.height = 'auto';
+
+            let active = agents[0];
+            for (let a of agents) { if (val.toLowerCase().includes(a.name.toLowerCase())) { active = a; break; } }
+
+            const bar = document.getElementById('status-bar');
+            const statusText = document.getElementById('status-text');
+            bar.style.display = 'flex';
+
+            try {
+                let loopCount = 0;
+                let currentUserInput = val;
+                let lastOutput = "";
+                let isApproved = false;
+
+                const writerSystemPrompt = `You are ARNOP, a highly capable AI assistant. You can help with anything — answer questions, write code, explain concepts, write essays, translate text, or have a conversation. 
+
+If the user asks for code or a script, write clean and complete code. 
+If the user asks a question, answer it clearly and helpfully.
+If the user wants creative writing, do that.
+Always respond directly and helpfully based on what the user actually needs.
+Return only your final response, no meta-commentary.`;
+
+                const reviewerSystemPrompt = `You are ARNOP Reviewer. Check the given response for accuracy, completeness, and quality.
+
+- If it is code: check for bugs or errors.
+- If it is a factual answer: check if it makes sense.
+- If it looks correct and complete, respond with: APPROVED: followed by the original response.
+- If you find issues, respond with: FIXED: followed by the corrected version.
+
+Never change the language or tone of the response unnecessarily.`;
+
+                while (loopCount < 3 && !isApproved) {
+                    loopCount++;
+
+                    // STEP 1: Writer Agent
+                    statusText.innerText = "ARNOP Writing...";
+                    const writerOutput = await apiRequest(active, [
+                        { role: "system", content: writerSystemPrompt },
+                        { role: "user", content: currentUserInput }
+                    ]);
+
+                    lastOutput = writerOutput;
+
+                    // STEP 2: Reviewer Agent
+                    statusText.innerText = "ARNOP Reviewing...";
+                    const reviewerResponse = await apiRequest(active, [
+                        { role: "system", content: reviewerSystemPrompt },
+                        { role: "user", content: writerOutput }
+                    ]);
+
+                    if (reviewerResponse.includes("APPROVED:")) {
+                        statusText.innerText = "ARNOP Approved — showing result";
+                        // Extract content after APPROVED:
+                        lastOutput = reviewerResponse.split("APPROVED:")[1].trim();
+                        isApproved = true;
+                    } else if (reviewerResponse.includes("FIXED:")) {
+                        const fixedVersion = reviewerResponse.split("FIXED:")[1].trim();
+                        // Re-feed fixed version as input to writer for refinement
+                        currentUserInput = "Reviewer suggests this version has errors or could be better: " + fixedVersion + " Please refine it.";
+                        lastOutput = fixedVersion;
+                    } else {
+                        // Safe fallback
+                        lastOutput = writerOutput;
+                        isApproved = true;
+                    }
+                }
+
+                appendMsg(lastOutput, 'ai', active.name);
+            } catch (err) {
+                appendMsg("Error: " + err.message, 'ai', "SYSTEM ERROR");
+            } finally {
+                setTimeout(() => { bar.style.display = 'none'; }, 1000);
+            }
+        }
+
+        function appendMsg(text, role, label = '') {
+            const chat = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `
+                ${label ? `<span class="agent-label">${label}</span>` : ''}
+                <div class="bubble">${text.replace(/\n/g, '<br>')}</div>
+            `;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function initEmptyChat() {
+            const welcome = agents.map(a => a.name).join(', ');
+            document.getElementById('chat-window').innerHTML = `
+                <div class="empty-note" style="text-align:center; padding:100px 20px; color:#444; font-size:13px;">
+                    Active API Channels: <strong>${welcome}</strong><br><br>
+                    ARNOP Multi-Agent system is ready. Mention an agent name in the prompt to use a specific key.
+                </div>`;
+        }
+
+        window.onload = () => {
+            if (localStorage.getItem('arnop_data')) {
+                showScreen('chat');
+                initEmptyChat();
+            } else {
+                showScreen('dashboard');
+                renderDashboard();
+            }
+        };
+
+        document.getElementById('send-btn').onclick = handleSend;
+        document.getElementById('user-input').oninput = function() {
+            this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';
+        };
+        document.getElementById('user-input').onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/self-update.js": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  }
+}
