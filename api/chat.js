@@ -14,6 +14,12 @@ export default async function handler(req, res) {
     deepseek: process.env.DEEPSEEK_API_KEY
   };
 
+  // If asking which providers are available
+  if (req.body.getProviders) {
+    const available = Object.keys(keys).filter(k => keys[k]);
+    return res.status(200).json({ providers: available });
+  }
+
   const p = provider || 'groq';
   const apiKey = keys[p];
   if (!apiKey) return res.status(400).json({ error: `No API key for provider: ${p}` });
@@ -36,7 +42,7 @@ export default async function handler(req, res) {
       );
       const d = await r.json();
       if (!d.candidates || !d.candidates[0]) {
-        return res.status(500).json({ error: 'Gemini returned no candidates: ' + JSON.stringify(d) });
+        return res.status(500).json({ error: 'Gemini error: ' + JSON.stringify(d) });
       }
       result = d.candidates[0].content.parts[0].text;
     } else {
@@ -64,7 +70,7 @@ export default async function handler(req, res) {
       });
       const d = await r.json();
       if (!d.choices || !d.choices[0]) {
-        return res.status(500).json({ error: 'API returned no choices: ' + JSON.stringify(d) });
+        return res.status(500).json({ error: 'API error: ' + JSON.stringify(d) });
       }
       result = d.choices[0].message.content;
     }
