@@ -14,21 +14,30 @@ export default async function handler(req, res) {
     deepseek: process.env.DEEPSEEK_API_KEY
   };
 
-  const apiKey = keys[provider || 'groq'];
-  if (!apiKey) return res.status(400).json({ error: 'Provider not configured' });
+  const p = provider || 'groq';
+  const apiKey = keys[p];
+  if (!apiKey) return res.status(400).json({ error: `No API key for provider: ${p}` });
 
   try {
     let result = '';
-    if (provider === 'gemini') {
+
+    if (p === 'gemini') {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: messages.map(m => ({ parts: [{ text: m.content }] })) })
+          body: JSON.stringify({
+            contents: messages
+              .filter(m => m.role !== 'system')
+              .map(m => ({ parts: [{ text: m.content }] }))
+          })
         }
       );
       const d = await r.json();
+      if (!d.candidates || !d.candidates[0]) {
+        return res.status(500).json({ error: 'Gemini returned no candidates: ' + JSON.stringify(d) });
+      }
       result = d.candidates[0].content.parts[0].text;
     } else {
       const endpoints = {
@@ -41,21 +50,25 @@ export default async function handler(req, res) {
         mistral: 'mistral-small-latest',
         deepseek: 'deepseek-chat'
       };
-      const r = await fetch(endpoints[provider || 'groq'], {
+      const r = await fetch(endpoints[p], {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: models[provider || 'groq'],
+          model: models[p],
           max_tokens: 1000,
           messages
         })
       });
       const d = await r.json();
+      if (!d.choices || !d.choices[0]) {
+        return res.status(500).json({ error: 'API returned no choices: ' + JSON.stringify(d) });
+      }
       result = d.choices[0].message.content;
     }
+
     res.status(200).json({ result });
   } catch (e) {
     res.status(500).json({ error: e.message });
