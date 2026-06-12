@@ -23,10 +23,9 @@
 
         .app-container { display: flex; width: 100%; height: 100vh; position: relative; }
 
-        /* Sidebar as an Overlay */
         #sidebar {
             position: fixed;
-            right: -280px; /* Hidden state */
+            right: -280px; 
             top: 0;
             width: 280px;
             height: 100vh;
@@ -35,7 +34,7 @@
             display: flex;
             flex-direction: column;
             transition: right 0.3s ease;
-            z-index: 1001; /* Above overlay */
+            z-index: 1001; 
             box-shadow: -10px 0 20px rgba(0,0,0,0.5);
         }
         #sidebar.active { right: 0; }
@@ -77,7 +76,6 @@
         }
         .history-item:hover { background: #1a1a1a; color: white; }
 
-        /* Main Chat Area (Does not shrink when panel opens) */
         .chat-main { flex: 1; display: flex; flex-direction: column; position: relative; width: 100%; height: 100%; }
         
         header { 
@@ -116,7 +114,6 @@
         .individual-ans { padding: 12px; border-bottom: 1px solid var(--border); }
         .ans-header { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 4px; text-transform: uppercase; }
 
-        /* Interaction Overlay (Darkens background but allows clicking below in specific areas) */
         #overlay {
             display: none;
             position: fixed;
@@ -126,7 +123,6 @@
         }
         #overlay.active { display: block; }
 
-        /* Input Area with Search Toggle */
         .input-area { background: var(--bg); padding: 20px; z-index: 10; }
         .input-wrapper { max-width: 850px; margin: 0 auto; background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; position: relative; }
         textarea { width: 100%; background: none; border: none; color: var(--text); outline: none; resize: none; font-size: 15px; min-height: 24px; padding-right: 140px;}
@@ -179,7 +175,6 @@
     <div id="overlay" onclick="toggleSidebar()"></div>
 
     <div class="app-container">
-        <!-- Overlay Panel Contents -->
         <div id="sidebar">
             <div class="sidebar-header">
                 <button class="new-chat-btn" onclick="startNewChat()">New Chat</button>
@@ -313,7 +308,14 @@
                 ...memory
             ];
 
-            const providers = ['groq', 'gemini', 'mistral', 'deepseek'];
+            const providerCheck = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ getProviders: true, messages: [], provider: '' })
+            });
+            const providerData = await providerCheck.json();
+            const providers = providerData.providers || ['groq'];
+
             const responses = await Promise.all(providers.map(p => callAPI(p, contextMessages)));
             const validResponses = providers.map((p, i) => ({ provider: p, content: responses[i] }))
                                             .filter(r => r.content !== null);
@@ -432,7 +434,6 @@
                     Start a fresh parallel conversation. Memory will begin with the user turn.
                 </div>
             `;
-            // Only hide sidebar if user is starting chat from history (avoids flicker on init)
             if (document.getElementById('sidebar').classList.contains('active')) toggleSidebar();
         }
 
@@ -502,4 +503,4 @@
         };
     </script>
 </body>
-</html>
+</html>-
