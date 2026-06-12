@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         deepseek: 'https://api.deepseek.com/v1/chat/completions'
       };
       const models = {
-        groq: 'llama3-8b-8192',
+    groq: 'llama-3.3-70b-versatile',
         mistral: 'mistral-small-latest',
         deepseek: 'deepseek-chat'
       };
