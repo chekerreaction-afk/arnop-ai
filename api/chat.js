@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { messages, provider } = req.body;
+  const { messages, provider, getProviders } = req.body;
 
   const keys = {
     groq: process.env.GROQ_API_KEY,
@@ -14,15 +14,26 @@ export default async function handler(req, res) {
     deepseek: process.env.DEEPSEEK_API_KEY
   };
 
-  // If asking which providers are available
-  if (req.body.getProviders) {
+  if (getProviders) {
     const available = Object.keys(keys).filter(k => keys[k]);
     return res.status(200).json({ providers: available });
   }
 
-  const p = provider || 'groq';
+  const p = provider || Object.keys(keys).find(k => keys[k]);
   const apiKey = keys[p];
   if (!apiKey) return res.status(400).json({ error: `No API key for provider: ${p}` });
+
+  // Fix message alternation
+  const systemMsg = messages.find(m => m.role === 'system');
+  const otherMsgs = messages.filter(m => m.role !== 'system');
+  const fixedMsgs = [];
+  let lastRole = null;
+  for (const m of otherMsgs) {
+    if (m.role === lastRole) continue;
+    fixedMsgs.push(m);
+    lastRole = m.role;
+  }
+  const safeMessages = systemMsg ? [systemMsg, ...fixedMsgs] : fixedMsgs;
 
   try {
     let result = '';
@@ -34,7 +45,7 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: messages
+            contents: safeMessages
               .filter(m => m.role !== 'system')
               .map(m => ({ parts: [{ text: m.content }] }))
           })
@@ -52,7 +63,7 @@ export default async function handler(req, res) {
         deepseek: 'https://api.deepseek.com/v1/chat/completions'
       };
       const models = {
-    groq: 'llama-3.3-70b-versatile',
+        groq: 'llama-3.3-70b-versatile',
         mistral: 'mistral-small-latest',
         deepseek: 'deepseek-chat'
       };
@@ -65,7 +76,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: models[p],
           max_tokens: 1000,
-          messages
+          messages: safeMessages
         })
       });
       const d = await r.json();
