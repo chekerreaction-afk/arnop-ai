@@ -218,6 +218,25 @@
         let userProfile = localStorage.getItem('arnop_user_profile') || 'User tone: helpful. Preferences: clean logic.';
         let searchEnabled = localStorage.getItem('arnop_search_enabled') === 'true';
 
+        // Bug 2 Fix: Module-level cache for providers
+        let cachedProviders = null;
+
+        async function getAvailableProviders() {
+            if (cachedProviders) return cachedProviders;
+            try {
+                const r = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ getProviders: true, messages: [], provider: '' })
+                });
+                const d = await r.json();
+                cachedProviders = d.providers || ['groq'];
+            } catch(e) {
+                cachedProviders = ['groq'];
+            }
+            return cachedProviders;
+        }
+
         const chatWindow = document.getElementById('chat-window');
         const inputEl = document.getElementById('user-input');
         const statusText = document.getElementById('status-text');
@@ -309,14 +328,8 @@
                 ...memory
             ];
 
-            // Change 1 logic starts here
-            const providerCheck = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ getProviders: true, messages: [], provider: '' })
-            });
-            const providerData = await providerCheck.json();
-            const providers = providerData.providers || ['groq'];
+            // Bug 2 logic applied here: Use cached providers
+            const providers = await getAvailableProviders();
 
             const responses = await Promise.all(providers.map(p => callAPI(p, contextMessages)));
             const validResponses = providers.map((p, i) => ({ provider: p, content: responses[i] }))
@@ -330,16 +343,22 @@
 
             statusText.innerText = "Filtering best answer...";
             
-            const filterPrompt = `User message: ${val}. Pick the best response for clarity, code accuracy, and detail. Return JSON: {"winner_index": 0, "reason": "brief summary"}. Available answers:\n` +
-                validResponses.map((r, i) => `[${i}] Source ${r.provider}: ${r.content}`).join('\n\n');
-
-            // Change 2 logic: use providers[0] instead of 'gemini' for filtering
-            const filterResultRaw = await callAPI(providers[0], [{role: 'user', content: filterPrompt}]);
-            
             let bestIndex = 0;
+            // Bug 1 Fix: Replace complex filter prompt and match logic with robust timeout-friendly version
             try {
-                const cleanJson = filterResultRaw.match(/\{.*\}/s)[0];
-                bestIndex = JSON.parse(cleanJson).winner_index;
+                if (validResponses.length === 1) {
+                    bestIndex = 0;
+                } else {
+                    const snippets = validResponses.map((r, i) => `[${i}] ${r.content.substring(0, 150)}`).join('\n');
+                    const filterResultRaw = await callAPI(providers[0], [{
+                        role: 'user',
+                        content: `Reply with ONLY this JSON and nothing else: {"winner_index": 0}\nPick best answer for: "${val.substring(0, 100)}"\nOptions:\n${snippets}`
+                    }]);
+                    if (filterResultRaw) {
+                        const match = filterResultRaw.match(/"winner_index"\s*:\s*(\d+)/);
+                        if (match) bestIndex = Math.min(parseInt(match[1]) || 0, validResponses.length - 1);
+                    }
+                }
             } catch (e) { bestIndex = 0; }
 
             const winner = validResponses[bestIndex] || validResponses[0];
@@ -363,13 +382,9 @@
             const log = currentMessages.slice(-20).map(m => m.content).join('\n');
             const p = `Analyze this for style and code preferences. Summary in 2 sentences. History: ${log}`;
             
-            const providerCheck = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ getProviders: true, messages: [], provider: '' })
-            });
-            const providerData = await providerCheck.json();
-            const filterProvider = (providerData.providers && providerData.providers.length > 0) ? providerData.providers[0] : 'groq';
+            // Bug 2 logic applied here: Use cached providers
+            const providers = await getAvailableProviders();
+            const filterProvider = providers[0] || 'groq';
 
             const analysis = await callAPI(filterProvider, [{role: 'user', content: p}]);
             if(analysis) {
